@@ -8,6 +8,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+// Imported here rather than by the site's entry point, so the stylesheet
+// travels in the same lazy chunk as the component and `make sync-site` has
+// one fewer thing to get right.
+import "./frontend.css";
+
 import {
   EXAMPLES,
   FLAGSHIP,
@@ -48,6 +53,40 @@ const DEBOUNCE_MS = 650;
  * make them disagree, so non-ASCII input is reported rather than mis-sliced.
  * See `asciiOnly` below.
  */
+// How a pointer opens an explanation.
+//
+// Every path opens; nothing toggles. That is not laziness, it is the only
+// version that survives the event sequence a real tap produces. Chrome
+// delivers, for one tap on a button:
+//
+//   pointerover:touch  pointerenter:touch  pointerdown:touch  touchstart
+//   pointerup:touch    touchend           mouseover  mouseenter
+//   mousedown  mouseup  click:touch
+//
+// A `focus` lands in there too, because the target is a button. So any design
+// where one of those opens and a later one toggles will open and immediately
+// close again -- and with eleven events in play, which pair collides depends on
+// whether the element was already focused, whether the pointer was already
+// over it, and which browser. The phone symptom is that the explanation never
+// appears at all, which is invisible from a desktop and is the only way most
+// people will read this.
+//
+// So: hover opens, focus opens, tap opens, and `Detail` carries an explicit
+// dismiss. Reaching another word replaces the open one, which is what someone
+// reading through the sentence is doing anyway.
+function openers(key, openKey, onOpen) {
+  return {
+    "aria-expanded": openKey === key,
+    onPointerEnter: (event) => {
+      // Only a real pointer. A tap also emits pointerenter, and letting it
+      // through here puts us back in the collision above.
+      if (event.pointerType === "mouse") onOpen(key);
+    },
+    onFocus: () => onOpen(key),
+    onClick: () => onOpen(key),
+  };
+}
+
 function cut(text, spans) {
   const ordered = [...spans].sort((a, b) => a.start - b.start);
   const runs = [];
@@ -74,10 +113,7 @@ function Marked({ text, spans, openKey, onOpen, tone = "change" }) {
             className={`fx-mark fx-${run.span.tone || tone} ${
               openKey === run.span.key ? "is-open" : ""
             }`}
-            aria-expanded={openKey === run.span.key}
-            onMouseEnter={() => onOpen(run.span.key)}
-            onFocus={() => onOpen(run.span.key)}
-            onClick={() => onOpen(openKey === run.span.key ? null : run.span.key)}
+            {...openers(run.span.key, openKey, onOpen)}
           >
             {run.text}
           </button>
@@ -89,7 +125,7 @@ function Marked({ text, spans, openKey, onOpen, tone = "change" }) {
   );
 }
 
-function Detail({ open, explanations }) {
+function Detail({ open, explanations, onClose }) {
   const body = open ? explanations[open] : null;
   return (
     <div className={`fx-detail ${body ? "is-open" : ""}`} aria-live="polite">
@@ -97,6 +133,14 @@ function Detail({ open, explanations }) {
         <>
           <span className="fx-detail-head">{body.head}</span>
           <span className="fx-detail-body">{body.text}</span>
+          <button
+            type="button"
+            className="fx-detail-close"
+            aria-label="close this explanation"
+            onClick={onClose}
+          >
+            ×
+          </button>
         </>
       ) : (
         <span className="fx-detail-idle">
@@ -148,7 +192,7 @@ function OriginalStage({ text, sayso, open, onOpen }) {
   return (
     <Stage n="00" name="what you typed" what={`${spans.length} span${spans.length === 1 ? "" : "s"} to rewrite`}>
       <Marked text={text} spans={spans} openKey={open} onOpen={onOpen} tone="found" />
-      <Detail open={open} explanations={explanations} />
+      <Detail open={open} explanations={explanations} onClose={() => onOpen(null)} />
     </Stage>
   );
 }
@@ -181,7 +225,7 @@ function NormalizedStage({ sayso, open, onOpen }) {
   return (
     <Stage n="01" name="normalised" what="sayso · WebAssembly, in this tab">
       <Marked text={sayso?.output ?? ""} spans={spans} openKey={open} onOpen={onOpen} />
-      <Detail open={open} explanations={explanations} />
+      <Detail open={open} explanations={explanations} onClose={() => onOpen(null)} />
     </Stage>
   );
 }
@@ -238,7 +282,7 @@ function PhonemeStage({ sayso, lede, open, onOpen }) {
               than one that says it does not know.
             </p>
           )}
-          <Detail open={open} explanations={explanations} />
+          <Detail open={open} explanations={explanations} onClose={() => onOpen(null)} />
         </>
       ) : (
         <p className="fx-text fx-waiting">—</p>
@@ -312,10 +356,8 @@ function BreakStage({ caesura, open, onOpen }) {
                 className={`fx-brk fx-brk-${breaks[i]} ${
                   open === `br-${i}` ? "is-open" : ""
                 }`}
-                aria-expanded={open === `br-${i}`}
-                onMouseEnter={() => onOpen(`br-${i}`)}
-                onFocus={() => onOpen(`br-${i}`)}
-                onClick={() => onOpen(open === `br-${i}` ? null : `br-${i}`)}
+                aria-label={`break after ${words[i]}`}
+                {...openers(`br-${i}`, open, onOpen)}
               >
                 {breaks[i] === "b3" ? "‖" : "│"}
               </button>
@@ -324,10 +366,8 @@ function BreakStage({ caesura, open, onOpen }) {
               <button
                 type="button"
                 className={`fx-veto ${open === `veto-${i}` ? "is-open" : ""}`}
-                aria-expanded={open === `veto-${i}`}
-                onMouseEnter={() => onOpen(`veto-${i}`)}
-                onFocus={() => onOpen(`veto-${i}`)}
-                onClick={() => onOpen(open === `veto-${i}` ? null : `veto-${i}`)}
+                aria-label={`suppressed break after ${words[i]}`}
+                {...openers(`veto-${i}`, open, onOpen)}
               >
                 ⊘
               </button>
@@ -341,7 +381,7 @@ function BreakStage({ caesura, open, onOpen }) {
         <span className="fx-veto">⊘</span> break suppressed{" "}
         <span className="fx-emph">word</span> emphasis
       </p>
-      <Detail open={open} explanations={explanations} />
+      <Detail open={open} explanations={explanations} onClose={() => onOpen(null)} />
     </Stage>
   );
 }

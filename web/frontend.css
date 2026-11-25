@@ -421,9 +421,15 @@
 .fx-eval tr.fx-baseline td {
   color: var(--muted);
 }
+/* Wraps by default. `nowrap` belongs on the short counts inside a table cell,
+   where a break would split "90 train" across two lines; in an <h5> the same
+   class carries a sentence-long subtitle, and nowrap there pushed the whole
+   document 18px wider than the phone it was being read on. */
 .fx-support {
   font-size: 11px;
   color: var(--faint);
+}
+.fx-eval td .fx-support {
   white-space: nowrap;
 }
 .fx-sentence {
@@ -467,4 +473,27 @@
   .fx-detail {
     min-height: 7.5em;
   }
+}
+
+/* Explicit dismissal, because nothing toggles. See `openers` in Frontend.jsx:
+   a tap delivers eleven events and any open/close pair among them collides. */
+.fx-detail {
+  position: relative;
+  padding-right: 34px;
+}
+.fx-detail-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fx-detail-close:hover {
+  color: var(--ink);
 }

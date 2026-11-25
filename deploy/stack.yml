@@ -55,7 +55,10 @@ services:
         - "traefik.http.routers.frontend_api.rule=(Host(`oscarpdalton.com`) || Host(`www.oscarpdalton.com`)) && PathPrefix(`/api/frontend`)"
         - "traefik.http.routers.frontend_api.tls=true"
         - "traefik.http.routers.frontend_api.tls.certresolver=letsEncrypt"
-        - "traefik.http.routers.frontend_api.middlewares=frontend_api_strip"
+        # Strip the path prefix, and compress the JSON, which is mostly
+        # repeated field names and compresses to about a fifth.
+        - "traefik.http.routers.frontend_api.middlewares=frontend_api_strip,frontend_api_compress"
+        - "traefik.http.middlewares.frontend_api_compress.compress=true"
         # The service knows nothing about the prefix; strip it before forwarding
         # so /api/frontend/v1/pipeline arrives as /v1/pipeline.
         - "traefik.http.middlewares.frontend_api_strip.stripprefix.prefixes=/api/frontend"
