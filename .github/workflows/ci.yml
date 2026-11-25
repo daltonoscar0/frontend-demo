@@ -1,0 +1,136 @@
+# CI runs offline.
+#
+# Nothing in this workflow reaches the network after the setup steps: the three
+# component repos are checked out, their data is restored from cache or fetched
+# once in a step that is explicitly allowed to, and the test job itself runs
+# with HF_HUB_OFFLINE=1. A test that silently downloads a model is a test that
+# passes for the wrong reason and fails when the Hub is slow.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # The reproduction job is slow, so it runs weekly rather than per push.
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+  OMP_NUM_THREADS: "2"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: frontend-demo }
+
+      # The three stages, and Scalpel, which sayso's tokeniser comes from.
+      - uses: actions/checkout@v4
+        with: { repository: daltonoscar0/sayso, path: sayso }
+      - uses: actions/checkout@v4
+        with: { repository: daltonoscar0/Scalpel, path: Scalpel }
+      - uses: actions/checkout@v4
+        with:
+          repository: daltonoscar0/Contextual-Homograph-Disambiguation-for-TTS
+          path: lede
+      - uses: actions/checkout@v4
+        with: { repository: daltonoscar0/caesura, path: caesura }
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+
+      # ---- stage 1, both builds -------------------------------------------
+      - name: Build sayso
+        run: make -C sayso sayso
+      - uses: mymindstorm/setup-emsdk@v14
+        with: { version: "3.1.64" }
+      - name: Build sayso for the browser
+        run: make -C frontend-demo/wasm SAYSO=../../sayso SCALPEL=../../Scalpel
+
+      # ---- dependencies ----------------------------------------------------
+      # The CPU wheel index, or pip pulls two gigabytes of CUDA for a service
+      # that will never see a GPU.
+      - name: Install
+        env: { HF_HUB_OFFLINE: "0", TRANSFORMERS_OFFLINE: "0" }
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r frontend-demo/api/requirements.txt
+          pip install -e ./sayso -e ./lede -e ./caesura
+          python -m spacy download en_core_web_sm
+
+      # ---- data ------------------------------------------------------------
+      # CMUdict and the homograph inventory, which lede resolves relative to its
+      # own checkout. Cached so the usual run does not fetch them at all.
+      - name: Cache lede corpora
+        id: corpora
+        uses: actions/cache@v4
+        with:
+          path: lede/data/vendor
+          key: lede-vendor-v1
+      - name: Fetch lede corpora
+        if: steps.corpora.outputs.cache-hit != 'true'
+        env: { HF_HUB_OFFLINE: "0" }
+        run: bash lede/scripts/fetch_data.sh
+
+      # The encoder lede serves with. Cached; fetched once when the cache is
+      # cold, in a step that says so.
+      - name: Cache the encoder
+        id: encoder
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: encoder-distilroberta-base-v1
+      - name: Fetch the encoder
+        if: steps.encoder.outputs.cache-hit != 'true'
+        env: { HF_HUB_OFFLINE: "0", TRANSFORMERS_OFFLINE: "0" }
+        run: |
+          python - <<'PY'
+          from transformers import AutoModel, AutoTokenizer
+          AutoTokenizer.from_pretrained("distilroberta-base")
+          AutoModel.from_pretrained("distilroberta-base", output_hidden_states=True)
+          PY
+
+      # caesura's System B weights are 326 MB and only the break tests need
+      # them. Left absent on a pull request, where those tests skip and say so.
+      - name: Cache caesura weights
+        id: breaks
+        uses: actions/cache@v4
+        with:
+          path: caesura/outputs/breaks
+          key: caesura-breaks-v1
+      - name: Fetch caesura weights
+        if: steps.breaks.outputs.cache-hit != 'true' && github.event_name != 'pull_request'
+        env: { HF_HUB_OFFLINE: "0" }
+        run: |
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          snapshot_download("daltonoscar0/caesura-breaks",
+                            local_dir="caesura/outputs/breaks",
+                            allow_patterns=["*.json", "*.safetensors"])
+          PY
+
+      # ---- the suites ------------------------------------------------------
+      - name: sayso's own tests
+        run: make -C sayso test
+
+      - name: The chain
+        working-directory: frontend-demo
+        env: { CAESURA_MODEL: ../caesura/outputs/breaks }
+        run: python -m pytest -q
+
+      # Weekly only: re-run every evaluation and fail if a number moved. The
+      # page quotes these files, so a silent drift is a wrong number in front of
+      # a reader.
+      - name: Reproduce every published number
+        if: github.event_name == 'schedule'
+        working-directory: frontend-demo
+        env: { CAESURA_MODEL: ../caesura/outputs/breaks }
+        run: python -m pytest -q -m slow

@@ -1,0 +1,19 @@
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+
+# The WebAssembly build is a build artefact; `make wasm` reproduces it and
+# tests/test_wasm_parity.py pins it to the binary. The copy the site serves is
+# committed in the site repo, where it has to be to be served.
+wasm/dist/
+
+# Agent scratch, per the sibling repos.
+CLAUDE.md
+AGENTS.md
+.claude/
+.agentnotes/
+.cursor/
+.mcp.json

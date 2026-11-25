@@ -1,0 +1,78 @@
+# Swarm service for the front-end API, to sit beside oscar-site behind the same
+# Traefik router. Deploying this moves the demo's backend from a Hugging Face
+# Space onto oscarpdalton.com/api, which removes the Space's cold start and the
+# cross-origin hop.
+#
+# One command, on a manager node:
+#
+#     docker stack deploy -c stack.yml frontend-api
+#
+# After that it maintains itself: the GitHub Actions workflow in
+# frontend-demo/.github/workflows/api-image.yml pushes a new `latest` to GHCR on
+# every push to main, and shepherd (already running for oscar-site) rolls the
+# service forward within three minutes. The `shepherd.*.enable` label below is
+# what opts it in, matching the pattern in oscar-site/compose.yml.
+#
+# Nothing here touches the existing oscar-site service or its router.
+
+services:
+  frontend-api:
+    image: ghcr.io/daltonoscar0/frontend-demo-api:latest
+    restart: unless-stopped
+    environment:
+      # Only the page calls this, and only from these origins.
+      ALLOWED_ORIGINS: "https://oscarpdalton.com,https://www.oscarpdalton.com"
+      # Always behind Traefik here, so the forwarded header is the real client.
+      TRUST_PROXY: "1"
+      MAX_CHARS: "500"
+      MAX_WORDS: "80"
+      RATE_PER_MINUTE: "30"
+      RATE_BURST: "12"
+      TORCH_THREADS: "2"
+      OMP_NUM_THREADS: "2"
+      PORT: "7860"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          # Measured peak with both models resident is 778 MB. 1.5 GB leaves
+          # room for a long request's activations without letting a leak take
+          # the node down. A single replica, because two would hold a second
+          # copy of both models for throughput a demo cannot use.
+          memory: 1536M
+          cpus: "2.0"
+        reservations:
+          memory: 1024M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik"
+        - "traefik.http.routers.frontend_api.entrypoints=https"
+        # A path prefix on the existing host rather than a new subdomain, so no
+        # new DNS record and no new certificate are needed.
+        - "traefik.http.routers.frontend_api.rule=(Host(`oscarpdalton.com`) || Host(`www.oscarpdalton.com`)) && PathPrefix(`/api/frontend`)"
+        - "traefik.http.routers.frontend_api.tls=true"
+        - "traefik.http.routers.frontend_api.tls.certresolver=letsEncrypt"
+        - "traefik.http.routers.frontend_api.middlewares=frontend_api_strip"
+        # The service knows nothing about the prefix; strip it before forwarding
+        # so /api/frontend/v1/pipeline arrives as /v1/pipeline.
+        - "traefik.http.middlewares.frontend_api_strip.stripprefix.prefixes=/api/frontend"
+        - "traefik.http.services.frontend_api.loadbalancer.server.port=7860"
+        - "shepherd.frontend-api.enable=true"
+    networks:
+      - traefik
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7860/health"]
+      interval: 30s
+      timeout: 10s
+      # Both models load before the first request is accepted, which takes about
+      # 15 s cold. A shorter start period would restart the container mid-load,
+      # forever.
+      start_period: 120s
+      retries: 3
+
+networks:
+  traefik:
+    external: true

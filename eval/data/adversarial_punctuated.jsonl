@@ -1,0 +1,61 @@
+{"_comment": "Written-English punctuation for caesura's 60 hand-annotated adversarial sentences, so that a punctuation-only system can be scored against hand-annotated prosody. Each `punctuated` field is how a careful writer would punctuate that sentence -- not where a speaker pauses. The whole point is that those two are different, and the difference is what eval_breaks.py measures. Written before looking at any system's output, from the sentence alone. Commas that written English does not license are absent even where the prosodic gold wants a break there, which is the case for every reduced relative, every long subject, and the whole non_punctuation_break bucket: putting a comma between a subject and its verb is not something a writer does, however long the subject and however clearly a reader pauses."}
+{"id": "adv-001", "punctuated": "The horse raced past the barn fell."}
+{"id": "adv-002", "punctuated": "The man returned to his house was arrested."}
+{"id": "adv-003", "punctuated": "The florist sent the flowers was pleased."}
+{"id": "adv-004", "punctuated": "The defendant examined by the lawyer turned out to be unreliable."}
+{"id": "adv-005", "punctuated": "The boat floated down the river sank."}
+{"id": "adv-006", "punctuated": "The student given the answers cheated."}
+{"id": "adv-007", "punctuated": "The soldiers marched across the field were exhausted."}
+{"id": "adv-008", "punctuated": "The woman brought the sandwiches left early."}
+{"id": "adv-009", "punctuated": "The coach smiled at the player tossed the frisbee."}
+{"id": "adv-010", "punctuated": "The experienced soldiers warned about the dangers conducted the midnight raid."}
+{"id": "adv-011", "punctuated": "While the man hunted, the deer ran into the woods."}
+{"id": "adv-012", "punctuated": "Since Jay always jogs, a mile seems like a short distance."}
+{"id": "adv-013", "punctuated": "After the child visited, the doctor prescribed a course of antibiotics."}
+{"id": "adv-014", "punctuated": "Before the police stopped, the driver was getting nervous."}
+{"id": "adv-015", "punctuated": "As the criminal shot, the woman screamed."}
+{"id": "adv-016", "punctuated": "Whenever the band played, the crowd cheered loudly."}
+{"id": "adv-017", "punctuated": "Though the boy read, the letter remained on the table."}
+{"id": "adv-018", "punctuated": "When the dog scratched, the vet gave it a sedative."}
+{"id": "adv-019", "punctuated": "The man who came to dinner last night left his umbrella in the hall."}
+{"id": "adv-020", "punctuated": "The very tall woman standing by the door waved at us."}
+{"id": "adv-021", "punctuated": "All of the people waiting in the long line outside the theatre got in."}
+{"id": "adv-022", "punctuated": "The report that the committee published last spring was widely criticised."}
+{"id": "adv-023", "punctuated": "Everything that could possibly go wrong on a trip like this did."}
+{"id": "adv-024", "punctuated": "The small brown dog with the torn left ear belongs to my neighbour."}
+{"id": "adv-025", "punctuated": "Several of the older students in the advanced class failed the exam."}
+{"id": "adv-026", "punctuated": "The letter my grandmother wrote during the war arrived last week."}
+{"id": "adv-027", "punctuated": "She went home, and he stayed at the office."}
+{"id": "adv-028", "punctuated": "I spoke to the manager, and the assistant manager was there too."}
+{"id": "adv-029", "punctuated": "He ordered soup and salad and a glass of wine."}
+{"id": "adv-030", "punctuated": "We invited the old men and women."}
+{"id": "adv-031", "punctuated": "Old men and women were evacuated first."}
+{"id": "adv-032", "punctuated": "You can have coffee or tea, and a biscuit."}
+{"id": "adv-033", "punctuated": "We studied French and German literature."}
+{"id": "adv-034", "punctuated": "The professor said the students who cheated and their friends would be expelled."}
+{"id": "adv-035", "punctuated": "My brother, the doctor, said it was nothing serious."}
+{"id": "adv-036", "punctuated": "Doctor Lee, the head of cardiology, will see you now."}
+{"id": "adv-037", "punctuated": "Tell me, sir, what you saw."}
+{"id": "adv-038", "punctuated": "The capital of France, Paris, is a beautiful city."}
+{"id": "adv-039", "punctuated": "She said, as far as I can tell, that the deal is off."}
+{"id": "adv-040", "punctuated": "His oldest friend, a man he had known since childhood, betrayed him."}
+{"id": "adv-041", "punctuated": "Mister President, the delegation has arrived."}
+{"id": "adv-042", "punctuated": "That idea, however, never gained much support."}
+{"id": "adv-043", "punctuated": "In the middle of the night, the phone rang."}
+{"id": "adv-044", "punctuated": "After a long and difficult negotiation, the two sides shook hands."}
+{"id": "adv-045", "punctuated": "Without any warning at all, the lights went out."}
+{"id": "adv-046", "punctuated": "Having finished her work, she went for a walk."}
+{"id": "adv-047", "punctuated": "On Reading Road at ten thirty, a live band was playing."}
+{"id": "adv-048", "punctuated": "Quite unexpectedly, the meeting was cancelled."}
+{"id": "adv-049", "punctuated": "To everyone's surprise, the youngest candidate won."}
+{"id": "adv-050", "punctuated": "If you leave now, you will still be late."}
+{"id": "adv-051", "punctuated": "The man in the grey coat is my uncle."}
+{"id": "adv-052", "punctuated": "What I want to know is why nobody told me."}
+{"id": "adv-053", "punctuated": "The reason he gave for being late was completely absurd."}
+{"id": "adv-054", "punctuated": "Whether we go or stay depends entirely on the weather."}
+{"id": "adv-055", "punctuated": "That the experiment failed so completely surprised everyone."}
+{"id": "adv-056", "punctuated": "Running through the rain without an umbrella is a bad idea."}
+{"id": "adv-057", "punctuated": "John said the professor is a fool."}
+{"id": "adv-058", "punctuated": "Everyone who knew him well agreed."}
+{"id": "adv-059", "punctuated": "The number of people who applied this year was much higher than expected."}
+{"id": "adv-060", "punctuated": "The question of whether the treaty will be ratified remains open."}

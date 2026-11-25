@@ -1,0 +1,205 @@
+# Hard cases for stage 1, and what a voice should say.
+#
+#   input <TAB> expected <TAB> class <TAB> note
+#
+# Scored by eval/eval_normalization.py, through the WebAssembly build the demo
+# page actually loads, with --style phone (the reading a voice gives a form
+# rather than the one a page does).
+#
+# HOW THE EXPECTED COLUMN WAS WRITTEN. By reading each input aloud and writing
+# down what came out, before running Sayso on it. That matters: a case file
+# generated from the system under test can only ever agree with it. Where the
+# two disagree, eval/results/normalization.json records the row and the
+# repository's failure table says which of the two is wrong, and three of the
+# categories below exist because a probe found a weakness and this file was then
+# written to measure it rather than to flatter it.
+#
+# TWO CONVENTIONS ARE BORROWED RATHER THAN JUDGED, because they are matters of
+# style that speech does not distinguish, and testing them would measure
+# agreement about formatting instead of about normalisation:
+#
+#   - Case. Month names are lowercase ("march fourteenth"); a proper noun keeps
+#     its capital, and an expansion inherits one when it has become part of a
+#     name ("Reading Road", "Doctor Lee") and not otherwise ("fifth avenue").
+#   - Hyphens and "and". "twenty-five", not "twenty five"; "nine hundred
+#     forty-two", not "nine hundred and forty two".
+#
+# Everything else -- which words, in what order, and whether a number is a
+# quantity or a string of digits -- is this file's own judgement.
+#
+# WHAT IS NOT HERE. Nothing testing the inverse direction: the demo only speaks.
+# Nothing where I could not decide what the right answer was; an uncertain row
+# adds noise and measures nothing.
+
+# ---------------------------------------------------------------------------
+# DATE. Every written shape should reach one spoken form, which is the property
+# that makes the inverse direction well defined.
+# ---------------------------------------------------------------------------
+3/14/2015	march fourteenth twenty fifteen	DATE	slash form, month first
+2015-03-14	march fourteenth twenty fifteen	DATE	ISO form, same spoken result
+March 14, 2015	march fourteenth twenty fifteen	DATE	written out, same spoken result
+14 March 2015	march fourteenth twenty fifteen	DATE	day first, same spoken result
+Jan 1, 2000	january first two thousand	DATE	abbreviated month, round year
+Dec 25	december twenty-fifth	DATE	no year
+7/4/1776	july fourth seventeen seventy-six	DATE	eighteenth-century year
+1/2/2026	january second twenty twenty-six	DATE	ambiguous against a fraction
+Feb 29, 2024	february twenty-ninth twenty twenty-four	DATE	leap day
+Sept 11, 2001	september eleventh two thousand one	DATE	four-letter abbreviation
+2026-01-05	january fifth twenty twenty-six	DATE	ISO with leading zeros
+Aug 1990	august nineteen ninety	DATE	abbreviated month with a bare year
+Jun 29	june twenty-ninth	DATE	three-letter abbreviation, no year
+11/22/63	november twenty-second sixty-three	DATE	two-digit year
+the 1980s	the nineteen eighties	DECADE	decade, not a cardinal
+the 1900s	the nineteen hundreds	DECADE	century rather than decade
+in 1999	in nineteen ninety-nine	DATE	bare year reads as a year
+by 2000	by two thousand	DATE	round year is not "twenty hundred"
+2026	twenty twenty-six	DATE	bare year, current century
+
+# ---------------------------------------------------------------------------
+# TIME
+# ---------------------------------------------------------------------------
+10:30	ten thirty	TIME	the flagship time
+6:45 am	six forty-five a m	TIME	meridiem is two spoken letters
+9:05	nine oh five	TIME	leading zero in the minute is "oh"
+12:00 pm	twelve p m	TIME	round hour drops the minute
+7:30 PM	seven thirty p m	TIME	uppercase meridiem
+11:02 pm	eleven oh two p m	TIME	hour that is also a year, disambiguated by the meridiem
+18:00	six in the evening	TIME	twenty-four hour clock
+08:15	eight fifteen	TIME	leading zero in the hour
+1:01 am	one oh one a m	TIME	both fields minimal
+10:45	ten forty-five	TIME	no meridiem, still a time
+3:00	three o'clock	TIME	round hour, no meridiem [adjudicated: I wrote "three"; "three o'clock" is what a voice says]
+
+# ---------------------------------------------------------------------------
+# ORDINAL
+# ---------------------------------------------------------------------------
+2nd	second	ORDINAL	the flagship ordinal
+1st	first	ORDINAL	irregular
+3rd	third	ORDINAL	irregular
+21st	twenty-first	ORDINAL	compound
+103rd	one hundred third	ORDINAL	three digits
+42nd	forty-second	ORDINAL	the one in "E 42nd St"
+12th	twelfth	ORDINAL	irregular stem
+20th	twentieth	ORDINAL	tens
+1,000th	one thousandth	ORDINAL	with a thousands separator
+the 2nd of May	the second of May	ORDINAL	ordinal inside a date phrase [adjudicated: "May" is not inside a rewritten span, so it keeps the capital it was written with]
+
+# ---------------------------------------------------------------------------
+# MONEY. Phone style elides: a voice says "twenty-five ten", not "twenty-five
+# dollars and ten cents".
+# ---------------------------------------------------------------------------
+$25.10	twenty-five ten	MONEY	the elided reading
+$0.99	ninety-nine cents	MONEY	under a dollar is cents
+$3 million	three million dollars	MONEY	magnitude word after the amount
+$1.5bn	one point five billion dollars	MONEY	magnitude as a suffix
+£12.50	twelve fifty	MONEY	sterling, elided
+€45	forty-five euros	MONEY	euro, whole amount
+25 cents	twenty-five cents	MONEY	bare cents
+$1	one dollar	MONEY	singular
+$1,234	one thousand two hundred thirty-four dollars	MONEY	thousands separator [adjudicated: I wrote the elided reading; an amount in the thousands is not elided, only the dollars-and-cents shape is]
+-$40	minus forty dollars	MONEY	a sign has to be spoken
+$26.6bn	twenty-six point six billion dollars	MONEY	decimal with a magnitude suffix
+
+# ---------------------------------------------------------------------------
+# MEASURE
+# ---------------------------------------------------------------------------
+2.5 km	two point five kilometers	MEASURE	decimal with a unit
+797 MB	seven hundred ninety-seven megabytes	MEASURE	byte units
+10 cm	ten centimeters	MEASURE	metric
+3 lb	three pounds	MEASURE	weight, not currency
+100 mph	one hundred miles per hour	MEASURE	compound unit
+32 F	thirty-two degrees fahrenheit	MEASURE	temperature
+5 ft 10 in	five feet ten inches	MEASURE	two units in one measurement
+
+# ---------------------------------------------------------------------------
+# CARDINAL and DECIMAL
+# ---------------------------------------------------------------------------
+1,234,567	one million two hundred thirty-four thousand five hundred sixty-seven	CARDINAL	grouped separators
+0.5	zero point five	DECIMAL	leading zero is spoken
+3.14159	three point one four one five nine	DECIMAL	digits after the point, one at a time
+1/2	half	FRACTION	bare fraction
+3/4	three quarters	FRACTION	plural denominator
+2 1/2	two and a half	FRACTION	mixed number
+11/100	eleven hundredths	FRACTION	large denominator
+1880	eighteen eighty	CARDINAL	four digits read as a pair
+1-10	one to ten	RANGE	a hyphen between numbers is a range
+
+# ---------------------------------------------------------------------------
+# PHONE. A conversational product reads these aloud and a page never does.
+# ---------------------------------------------------------------------------
+555-867-5309	five five five, eight six seven, five three oh nine	PHONE	North American, grouped
++1 (555) 123-4567	one, five five five, one two three, four five six seven	PHONE	country code and parentheses
+1-800-FLOWERS	one, eight oh oh, F L O W E R S	PHONE	vanity number, letters spelled
+(555) 123-4567	five five five, one two three, four five six seven	PHONE	parentheses, no country code
+555.867.5309	five five five, eight six seven, five three oh nine	PHONE	dots as separators
+dial 911	dial nine one one	PHONE	short code, not a quantity
+extension 4412	extension four four one two	PHONE	digits after a keyword
+PIN 4417	PIN four four one seven	PHONE	the same shape, different keyword
+
+# ---------------------------------------------------------------------------
+# ADDRESS. Probing found this the weakest area, so it is the largest, and the
+# house-number rows are here because they fail rather than in spite of it. A
+# street number is not a quantity: nobody says "one thousand six hundred
+# Pennsylvania Avenue".
+# ---------------------------------------------------------------------------
+Reading Rd	Reading Road	ADDRESS	the flagship address
+1600 Pennsylvania Ave NW	sixteen hundred Pennsylvania Avenue northwest	ADDRESS	house number is read in pairs, and a quadrant is a word
+350 5th Ave	three fifty fifth avenue	ADDRESS	house number in pairs, numbered street as an ordinal
+742 Evergreen Terrace	seven forty-two Evergreen Terrace	ADDRESS	three-digit house number
+1234 W Main St	twelve thirty-four west Main Street	ADDRESS	four-digit house number, direction, suffix
+E 42nd St	east forty-second street	ADDRESS	direction and numbered street
+10 Downing St	ten Downing Street	ADDRESS	small house number stays a cardinal
+221B Baker St	two twenty-one B Baker Street	ADDRESS	letter suffix on the house number
+St Paul St	Saint Paul Street	ADDRESS	"St" twice, two different readings
+Mt Vernon Ave	Mount Vernon Avenue	ADDRESS	two abbreviations in one span
+Ft Worth, TX	Fort Worth, Texas	ADDRESS	abbreviated place name with a state
+PO Box 1234	P O Box twelve thirty-four	ADDRESS	a box number is read in pairs
+Rt 66	Route sixty-six	ADDRESS	route abbreviation
+Apt 4B	apartment four B	ADDRESS	unit with a letter
+Ste 200	suite two hundred	ADDRESS	suite number is a quantity
+1 Infinite Loop	one Infinite Loop	ADDRESS	house number one
+Dr Martin Luther King Jr Blvd	Doctor Martin Luther King Junior Boulevard	ADDRESS	three abbreviations in one span
+St Louis, MO 63101	Saint Louis, Missouri six three one oh one	ADDRESS	title inside a city name, and a zip read as digits
+1 Infinite Loop, Cupertino, CA 95014	one Infinite Loop, Cupertino, California nine five oh one four	ADDRESS	full address
+
+# ---------------------------------------------------------------------------
+# ABBREVIATIONS WITH MORE THAN ONE READING. The point of the flagship sentence:
+# "Dr." is a doctor and "Rd" is a road, and neither is decided by a table.
+# ---------------------------------------------------------------------------
+Dr. Lee	Doctor Lee	NAME	title before a surname
+Lee Dr	Lee Drive	ADDRESS	the same letters as a street suffix
+I saw Dr. Lee on Lee Dr	I saw Doctor Lee on Lee Drive	ABBREV	both readings in one sentence
+St Paul	Saint Paul	NAME	saint before a name
+Paul St	Paul Street	ADDRESS	the same letters as a street suffix
+I walked down St Paul St to St Mary's	I walked down Saint Paul Street to Saint Mary's	ABBREV	three "St" tokens, two readings
+Mt Everest	Mount Everest	NAME	mountain
+No. 9	number nine	ABBREV	number sign
+vol 3	volume three	ABBREV	volume
+pp 1-10	pages one to ten	ABBREV	page range
+e.g. the 1980s	e g the nineteen eighties	LETTERS	dotted initialism is spelled
+i.e. tomorrow	i e tomorrow	LETTERS	the other common one
+Jr	junior	ABBREV	generational suffix [adjudicated: a bare Jr is not part of a name, so it does not inherit a capital]
+Sr	senior	ABBREV	the other one [adjudicated: as Jr]
+approx 40	approximately forty	ABBREV	clipped word
+
+# ---------------------------------------------------------------------------
+# NAME. A voice reads these and the classifier has to find them without a
+# gazetteer.
+# ---------------------------------------------------------------------------
+Mr. Smith	Mister Smith	NAME	title
+Mrs. Jane Doe	Missus Jane Doe	NAME	title with a full name
+Prof. Chomsky	Professor Chomsky	NAME	academic title
+Lt. Col. Baker	Lieutenant Colonel Baker	NAME	two titles in sequence
+Mr. and Mrs. Smith	Mister and Missus Smith	NAME	two titles joined by a lowercase word
+F. Scott Fitzgerald	F Scott Fitzgerald	NAME	one initial inside a name
+J. R. R. Tolkien	J R R Tolkien	NAME	three initials
+Elizabeth II	Elizabeth the second	NAME	regnal numeral
+Henry VIII	Henry the eighth	NAME	the same, larger numeral
+World War II	World War two	NAME	the same shape, not regnal
+
+# ---------------------------------------------------------------------------
+# THE FLAGSHIP SENTENCE, whole.
+# ---------------------------------------------------------------------------
+I read the 2nd Dr. Lee lead a live band on Reading Rd at 10:30	I read the second Doctor Lee lead a live band on Reading Road at ten thirty	PIPELINE	every stage-1 class the demo advertises, in one sentence
+The 2.5 km run starts at 6:45 am; 3/4 of the field paid £12.50.	The two point five kilometers run starts at six forty-five a m; three quarters of the field paid twelve fifty.	PIPELINE	four classes and surviving punctuation
+Call 555-867-5309 before 10:30 on 3/14/2015.	Call five five five, eight six seven, five three oh nine before ten thirty on march fourteenth twenty fifteen.	PIPELINE	phone, time and date together

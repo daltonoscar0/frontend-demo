@@ -1,0 +1,92 @@
+# Build the API image and push it to GHCR.
+#
+# This is the one workflow that needs the network at build time: the image bakes
+# in both sets of weights, the encoder, CMUdict and the homograph inventory so
+# that a request never reaches it.
+#
+# The three component repos are pinned by commit, not by branch. The evaluation
+# numbers on the page were measured against those commits and the page claims
+# the service is the evaluated system, so bumping them is a deliberate act.
+# `make pins` prints the current values.
+name: api image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - ".github/workflows/api-image.yml"
+  workflow_dispatch:
+    inputs:
+      lede_ref:
+        description: "lede commit"
+        required: false
+      caesura_ref:
+        description: "caesura commit"
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}-api
+  # Bump deliberately. See the note above.
+  LEDE_REF: 800c09b8c3247ae04c81d676f9033d35f6996b7f
+  CAESURA_REF: efdeeabf2016ba66af247c295c370421e5a548cc
+  SAYSO_REF: 6cdc7ba0d9482d21ede9ccf55aa2a099e9afd012
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            LEDE_REF=${{ inputs.lede_ref || env.LEDE_REF }}
+            CAESURA_REF=${{ inputs.caesura_ref || env.CAESURA_REF }}
+            SAYSO_REF=${{ env.SAYSO_REF }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A container that reports healthy is a container that has both models
+      # loaded, so this also checks the warm-up actually ran.
+      - name: Smoke test the image
+        run: |
+          docker run -d --name api -p 7860:7860 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:7860/health | grep -q '"ok":true'; then
+              echo "healthy after ${i}0s"; break
+            fi
+            sleep 10
+          done
+          curl -fsS http://127.0.0.1:7860/health | grep -q '"ok":true'
+          curl -fsS http://127.0.0.1:7860/v1/pipeline \
+            -H 'content-type: application/json' \
+            -d '{"normalized":"I read the second Doctor Lee lead a live band on Reading Road at ten thirty","name_spans":[[18,28],[49,61]],"pron_hints":{"Reading":{"arpabet":"R EH1 D IH0 NG"}},"system":"both"}' \
+            > out.json
+          # The four heteronyms, and no break inside the name.
+          grep -q '"R EH1 D"' out.json
+          grep -q '"L AY1 V"' out.json
+          grep -q 'model:name_span' out.json
+          echo "image answers correctly"
+          docker logs api | tail -20

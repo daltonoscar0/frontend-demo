@@ -1,0 +1,18 @@
+# Pinned to the versions the evaluation numbers were measured with, because the
+# service and the evaluation have to be the same system for the numbers on the
+# page to mean anything. torch, transformers and numpy match lede's and
+# caesura's requirements.txt exactly.
+#
+# scikit-learn is deliberately absent: it fits the probes and is not needed to
+# serve them. The probe weights ship inside the lede package.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.9.1
+transformers==4.57.1
+numpy==2.2.6
+spacy==3.8.7
+click==8.4.2
+
+fastapi==0.122.0
+uvicorn[standard]==0.41.0
+pydantic==2.14.4
