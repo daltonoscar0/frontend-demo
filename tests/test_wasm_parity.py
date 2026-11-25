@@ -31,13 +31,25 @@ BINARY = SAYSO / "sayso"
 WASM_RUNNER = ROOT / "wasm" / "parity.mjs"
 WASM_BUILD = ROOT / "wasm" / "dist" / "sayso.wasm"
 
-SETS = [
+# Sets that are committed, so they are present in every checkout and in CI.
+COMMITTED_SETS = [
     ("phone cases", SAYSO / "tests" / "data" / "phone_cases.tsv", 1),
+    ("normalisation hard cases", ROOT / "eval" / "data" / "normalization_cases.tsv", 0),
+]
+
+# Slices of the Google text normalisation corpus. sayso gitignores
+# `eval/data/*.tsv` because that corpus is not ours to redistribute, so these
+# exist only where someone has run sayso's own `convert_google_tn.py`. They are
+# the bulk of the 20,616 documents the README claims, and they are absent in CI
+# by design rather than by accident -- which is a distinction the count guard
+# below has to make, or it fails every run on a machine that is behaving.
+CORPUS_SETS = [
     ("shard 00099, developed against", SAYSO / "eval" / "data" / "google_tn_slice.tsv", 1),
     ("shard 00099, held out", SAYSO / "eval" / "data" / "heldout_slice.tsv", 1),
     ("shard 00098, never seen", SAYSO / "eval" / "data" / "shard98_slice.tsv", 1),
-    ("normalisation hard cases", ROOT / "eval" / "data" / "normalization_cases.tsv", 0),
 ]
+
+SETS = COMMITTED_SETS[:1] + CORPUS_SETS + COMMITTED_SETS[1:]
 
 pytestmark = pytest.mark.skipif(
     not (BINARY.exists() and WASM_BUILD.exists()),
@@ -106,10 +118,39 @@ def test_identical_documents(name, path, column, style):
             )
 
 
+def _count(sets) -> int:
+    return sum(len(inputs_from(p, c)) for _, p, c in sets if p.exists())
+
+
+def test_the_committed_sets_still_yield_their_inputs():
+    """A guard on the guard, for the part that is present everywhere.
+
+    If a path moves and a set silently empties, `test_identical_documents`
+    skips or compares nothing and passes vacuously. These two sets are in git,
+    so they are present in CI too and a moved path fails here rather than going
+    unnoticed until someone looks at the skip count.
+    """
+    for name, path, column in COMMITTED_SETS:
+        assert path.exists(), f"{name} is committed but missing at {path}"
+        assert inputs_from(path, column), f"{name} yielded no inputs"
+    total = _count(COMMITTED_SETS)
+    assert total > 350, f"only {total} inputs from the committed sets; check the paths"
+
+
 def test_the_sets_together_are_large_enough_to_mean_something():
-    """A guard on the guard: if a path moves and the sets silently empty, the
-    parity test above passes vacuously."""
-    total = sum(
-        len(inputs_from(path, column)) for _, path, column in SETS if path.exists()
-    )
+    """The README's claim: byte-identical on 20,616 documents.
+
+    Needs the corpus slices, which are not redistributable and so are absent in
+    CI. Absent, this skips and says what to run; present, the full count is
+    required, so the claim stays tested wherever it can be.
+    """
+    missing = [name for name, path, _ in CORPUS_SETS if not path.exists()]
+    if missing:
+        pytest.skip(
+            f"{len(missing)} corpus slice(s) absent ({', '.join(missing)}). They are "
+            f"slices of the Google text normalisation corpus, which sayso gitignores "
+            f"rather than redistribute; build them with sayso's "
+            f"eval/convert_google_tn.py. The committed sets are still compared above."
+        )
+    total = _count(SETS)
     assert total > 10_000, f"only {total} parity inputs found; check the paths"
