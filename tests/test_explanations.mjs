@@ -16,10 +16,14 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import {
+  EXAMPLES,
+  FLAGSHIP,
   explainBreak,
   explainNormalization,
   explainPronunciation,
   explainVeto,
+  precomputed,
+  precomputedInputs,
 } from "../web/pipeline.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -197,4 +201,63 @@ test("every decision in the flagship sentence produces a real sentence", () => {
   }
 });
 
-console.log(`\n${passed} explanation checks passed`);
+
+// --------------------------------------------------------------------------
+// The cold-start fallback
+//
+// Node runs this file, so these also prove pipeline.js still loads without a
+// bundler: the table is passed in rather than imported, and a bare JSON import
+// here would be ERR_IMPORT_ATTRIBUTE_MISSING.
+// --------------------------------------------------------------------------
+
+const precomputedTable = JSON.parse(
+  readFileSync(join(here, "..", "web", "precomputed.json"), "utf8"),
+);
+
+test("the flagship sentence has a saved answer", () => {
+  const saved = precomputed(precomputedTable, FLAGSHIP);
+  assert.ok(saved, "the page loads with this sentence; it must never be empty");
+  assert.ok(saved.lede.pronunciation.length > 40);
+  assert.ok(saved.caesura.output.includes("reading road"));
+});
+
+test("every example button has one", () => {
+  for (const example of EXAMPLES) {
+    assert.ok(
+      precomputed(precomputedTable, example.text),
+      `no saved answer for the "${example.label}" button`,
+    );
+  }
+});
+
+test("a saved answer is flagged as one", () => {
+  assert.equal(precomputed(precomputedTable, FLAGSHIP).precomputed, true);
+});
+
+test("a saved answer reports no latency", () => {
+  const saved = precomputed(precomputedTable, FLAGSHIP);
+  assert.ok(!("timings_ms" in saved), "nothing was timed, so nothing is timed");
+});
+
+test("a sentence nobody ran gets nothing rather than something close", () => {
+  assert.equal(precomputed(precomputedTable, "I read the 2nd Dr. Lee"), null);
+  assert.equal(precomputed(precomputedTable, `${FLAGSHIP} `), null);
+  assert.equal(precomputed(precomputedTable, ""), null);
+});
+
+test("a missing or malformed table is not a crash", () => {
+  assert.equal(precomputed(null, FLAGSHIP), null);
+  assert.equal(precomputed({}, FLAGSHIP), null);
+  assert.equal(precomputed({ entries: null }, FLAGSHIP), null);
+  assert.deepEqual(precomputedInputs(null), []);
+});
+
+test("the saved inputs are exactly the ones the page can reach", () => {
+  const reachable = new Set([FLAGSHIP, ...EXAMPLES.map((e) => e.text)]);
+  assert.deepEqual(
+    new Set(precomputedInputs(precomputedTable)),
+    reachable,
+  );
+});
+
+console.log(`\n${passed} checks passed`);

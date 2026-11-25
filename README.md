@@ -1,7 +1,16 @@
 # frontend-demo
 
 A text front end for speech synthesis: three stages chained into one pipeline,
-with a live demo at **[oscarpdalton.com/frontend](https://oscarpdalton.com/frontend)**.
+with a demo at **[oscarpdalton.com/frontend](https://oscarpdalton.com/frontend)**.
+
+> **Not live yet.** Both halves of the deploy are still outstanding, and the
+> page and the API are independent of each other: `make space` publishes the
+> model service (needs `hf auth login` first — the Space does not exist, so
+> `*.hf.space` 404s), and the site serves from `oscar-site`'s `deploy` branch,
+> which does not yet carry `src/frontend/`. Until the first happens the page
+> shows the saved answers described under [the cold start](#the-cold-start-and-what-the-page-shows-during-it);
+> until the second, the route is not there at all. Delete this note once both
+> are done.
 
 ```
 Input   →  "I read the 2nd Dr. Lee lead a live band on Reading Rd at 10:30"
@@ -247,8 +256,35 @@ stage 3 also needs a dependency parser. Measured, with both models resident:
 | warm request, both stages | ~100 ms |
 | cold start | 14 s, paid once at startup, never on a request |
 
-It is deployed as a [Hugging Face Space](api/README.md). Nothing is downloaded
-at runtime — weights, encoder, CMUdict, homograph inventory and spaCy pipeline
+### The cold start, and what the page shows during it
+
+The free CPU host idles out, so the first visitor after a quiet spell waits
+about half a minute for a container to wake. Stage 1 has already answered in
+the tab by then, and the last two panels would sit empty at exactly the moment
+someone is deciding whether to care.
+
+So the five inputs the page can reach without typing — the flagship sentence
+and the four example buttons — ship with stages 2 and 3 already computed, in
+[`web/precomputed.json`](web/precomputed.json) (68 KB). The page shows those,
+**labelled in words as saved rather than computed**, while the live request is
+in flight, and keeps showing them if it fails. A live answer for the current
+input always wins; edit the text and the panels go empty rather than show a
+saved answer for a sentence it was not computed from.
+
+They are real outputs from the real code, not written by hand:
+[`eval/make_precomputed.py`](eval/make_precomputed.py) runs the same sayso
+binary and the same `lede.api.run` and `caesura.api.run` the service calls, and
+`make check` fails if regenerating them would change anything. A fallback that
+had drifted from what the service answers would be worse than no fallback,
+because it would be wrong without looking wrong. Every per-stage timing is
+stripped, for the same reason: a saved panel must not report a latency it never
+incurred.
+
+### Deployment
+
+It is deployed as a [Hugging Face Space](api/README.md) by `make space`
+(`deploy/space.sh`), which needs `hf auth login` with a write token first.
+Nothing is downloaded at runtime — weights, encoder, CMUdict, homograph inventory and spaCy pipeline
 are all in the image, with `HF_HUB_OFFLINE=1` set, so a Hub outage cannot become
 a request failure. Per-IP rate limiting (30/min, burst 12) and a 500-character
 cap are in the application; validation runs *before* the limiter so an over-long

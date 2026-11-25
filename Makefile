@@ -23,7 +23,7 @@ wasm:
 # ---- the numbers ------------------------------------------------------
 # Each script writes results/<stage>.json and has a --check mode that fails if
 # the numbers moved. The page reads those files; no number on it is typed.
-eval: eval-normalization eval-heteronyms eval-breaks
+eval: eval-normalization eval-heteronyms eval-breaks precomputed
 
 eval-normalization: wasm
 	$(PY) eval/eval_normalization.py
@@ -34,10 +34,16 @@ eval-heteronyms:
 eval-breaks:
 	$(PY) eval/eval_breaks.py
 
+# The page's cold-start fallback: stages 2 and 3 for the five inputs the
+# buttons set, so the last two panels are not empty while the free host wakes.
+precomputed:
+	$(PY) eval/make_precomputed.py
+
 check: wasm
 	$(PY) eval/eval_normalization.py --check
 	$(PY) eval/eval_heteronyms.py --check
 	$(PY) eval/eval_breaks.py --check
+	$(PY) eval/make_precomputed.py --check
 
 # ---- tests ------------------------------------------------------------
 test: wasm
@@ -51,6 +57,7 @@ sync-site: wasm
 	@mkdir -p $(SITE)/src/frontend/results $(SITE)/public/frontend
 	cp web/Frontend.jsx web/pipeline.js $(SITE)/src/frontend/
 	cp web/frontend.css $(SITE)/src/frontend/
+	cp web/precomputed.json $(SITE)/src/frontend/
 	cp results/*.json $(SITE)/src/frontend/results/
 	cp wasm/dist/sayso.js wasm/dist/sayso.wasm $(SITE)/public/frontend/
 	@echo "synced to $(SITE); add the route and commit there"
