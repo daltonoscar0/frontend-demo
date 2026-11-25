@@ -138,6 +138,63 @@ That is the whole case for the stage existing, and it is not the case the
 aggregate makes. A front end with reliable punctuation should mostly trust it.
 One reading a phone transcript has nothing to trust.
 
+## What probing the demo found that the eval split does not
+
+Typing into the page is a different test from scoring a corpus, and it turned up
+two things the numbers above do not.
+
+**`minute` is read as the noun wherever it appears.** "a minute crack in the
+console" comes back `M IH1 N AH0 T` — the unit of time — where the adjective
+`M AY0 N UW1 T` is meant, at 0.70 to 0.83 confidence. The eval split does not
+catch it: `minute` scores 10/10 there, because 9 of its 10 eval sentences are
+the noun and the probe happens to get the single adjectival one. Training is 75
+noun against 12 adjective. So this is the skew problem Lede's README already
+names — 57 of the 162 homographs are over 95% skewed — showing up on a word the
+eval split is too small to expose. It is in the same family as the
+`gold_reading_nearly_absent` bucket, and the fix is targeted sentences for the
+minority reading, not a bigger encoder.
+
+An earlier version of the "heteronyms" example button contained "a minute tear",
+and it has been taken out. A sentence whose job is to demonstrate the stage
+should not carry a known wrong answer; the honest place for one is here.
+
+**A low confidence is a real signal.** `wound` in the heteronyms example comes
+back correct at 0.56, against 1.00 for the six around it. That is left in the
+example deliberately. A confidence worth reading has to be able to be low, and a
+front end could reasonably route a 0.56 somewhere else — to a lexicon, or to a
+human — in a way it would not route a 1.00.
+
+## On audio
+
+There is no play button, and the reason is specific rather than a shrug.
+
+The brief's condition was a free, open engine that **accepts phoneme input** and
+runs in the browser. Two candidates, and both fail on something that matters:
+
+- **The Web Speech API** (`speechSynthesis`) is free, needs no download and is
+  already in the browser, but it takes *text*, not phonemes. Chrome does not
+  implement SSML, so there is no `<phoneme>` to hand it the output of stage 2.
+  It would speak the sentence with its own built-in grapheme-to-phoneme, which
+  is the component this page exists to show — so the audio would be
+  demonstrating a different system while appearing to demonstrate this one.
+  That is worse than silence. Voice availability also varies by operating
+  system and is absent in some environments, which fails "runs reliably" on its
+  own.
+- **eSpeak-ng compiled to WebAssembly** does accept phoneme input, but in
+  Kirshenbaum notation rather than ARPAbet. Bridging them means a hand-written
+  phone mapping, which is a new unevaluated component sitting between the
+  measured output and what a listener hears — and every artefact in the audio
+  would then be ambiguous between the pipeline and the mapping. It is also a
+  few megabytes on top of a page that currently costs 257 KB, for output that
+  is robotic enough to make a correct phoneme string sound wrong.
+
+What *would* be worth doing, and is not done here, is speaking the normalised
+text with the browser's own voice **split at the predicted breaks**, so stage 3
+is audible without claiming anything about stage 2. That needs the audio to be
+labelled unambiguously as "the browser's voice, our phrasing", or it will be
+read as an endorsement of phonemes it never used. It is a page-design problem
+more than a technical one, and it was out of scope here.
+
 ## What the chain adds
 
 The stages are chained, not stacked. Stage 1 knows things stages 2 and 3 cannot

@@ -11,7 +11,7 @@ PY      ?= .venv/bin/python
 
 export CAESURA_MODEL ?= $(abspath $(CAESURA))/outputs/breaks
 
-.PHONY: all wasm eval test sync-site pins clean
+.PHONY: all wasm eval test check sync-site verify-page fixtures space serve pins clean
 
 all: wasm eval test
 
@@ -54,6 +54,24 @@ sync-site: wasm
 	cp results/*.json $(SITE)/src/frontend/results/
 	cp wasm/dist/sayso.js wasm/dist/sayso.wasm $(SITE)/public/frontend/
 	@echo "synced to $(SITE); add the route and commit there"
+
+# ---- the browser check ------------------------------------------------
+# Needs a server running; not part of `test`, which is offline.
+#   (cd ../oscar-site && VITE_FRONTEND_API=http://127.0.0.1:7860 npm run dev)
+#   make verify-page
+verify-page:
+	CHROME_CHANNEL=$${CHROME_CHANNEL:-chrome} node tests/verify_page.mjs $(ARGS)
+
+fixtures:
+	$(PY) eval/make_fixtures.py
+	node tests/test_explanations.mjs
+
+# ---- the model service ------------------------------------------------
+space:
+	deploy/space.sh
+
+serve:
+	cd api && ../$(PY) -m uvicorn app:app --host 127.0.0.1 --port 7860
 
 # ---- the pins the API image is built from -----------------------------
 pins:
