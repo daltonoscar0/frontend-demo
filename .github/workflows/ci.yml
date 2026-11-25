@@ -63,6 +63,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r frontend-demo/api/requirements.txt
+          # api/requirements.txt is what the service image installs, so it
+          # carries no test dependency. Without this the suite below cannot
+          # start at all: `No module named pytest`.
+          pip install pytest
           pip install -e ./sayso -e ./lede -e ./caesura
           python -m spacy download en_core_web_sm
 
@@ -125,6 +129,13 @@ jobs:
         working-directory: frontend-demo
         env: { CAESURA_MODEL: ../caesura/outputs/breaks }
         run: python -m pytest -q
+
+      # The prose the page puts in front of a reader, and the cold-start
+      # fallback. Plain node, no bundler, which is also what keeps pipeline.js
+      # importable without one.
+      - name: The page's own checks
+        working-directory: frontend-demo
+        run: node tests/test_explanations.mjs
 
       # Weekly only: re-run every evaluation and fail if a number moved. The
       # page quotes these files, so a silent drift is a wrong number in front of
