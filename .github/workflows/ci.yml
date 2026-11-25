@@ -64,9 +64,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r frontend-demo/api/requirements.txt
           # api/requirements.txt is what the service image installs, so it
-          # carries no test dependency. Without this the suite below cannot
-          # start at all: `No module named pytest`.
-          pip install pytest
+          # carries no test dependency. Without these the suite cannot start
+          # (`No module named pytest`), and the service tests cannot run
+          # (fastapi's TestClient is starlette's, which needs httpx).
+          pip install pytest httpx
           pip install -e ./sayso -e ./lede -e ./caesura
           python -m spacy download en_core_web_sm
 
