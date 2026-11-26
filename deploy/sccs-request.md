@@ -54,6 +54,20 @@ The stack file is attached. The specifics, so you can judge it:
   into the image and `HF_HUB_OFFLINE=1` is set, so it makes no outbound requests
   while serving.
 
+**One unrelated question, if you have a moment.** Almost everything on
+oscarpdalton.com is already gzipped — `/assets/index-*.js` arrives at 67.5 KB
+against 205.9 KB raw — so there is compression configured somewhere above the
+container. The exception is `.wasm`: `/frontend/sayso.wasm` is served at
+409.4 KB with no `content-encoding`, and that is 80% of the new page's 511 KB.
+Gzipped it is 112 KB, which would take the page to about 212 KB.
+
+I think that means `application/wasm` is not in whatever content-type list the
+compressor uses, but I cannot see that config from here and I did not want to
+guess at a Traefik label — an unsupported one breaks the router it is attached
+to. If it is a one-line addition at your end it is worth 297 KB on every first
+visit; if not, the page is perfectly usable as it is and this is not worth your
+time.
+
 If a second service in the stack is more than you want to take on, I'm happy
 with any of: a lower memory cap, a different path, or leaving it where it is on
 an external host — the demo works either way and I don't want to create work.

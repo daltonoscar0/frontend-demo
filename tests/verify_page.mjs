@@ -42,26 +42,65 @@ async function text(page, selector) {
   return el ? (await el.innerText()).replace(/\s+/g, " ").trim() : null;
 }
 
-/** Total bytes the browser actually pulled, by resource type. */
-function trackTransfer(page, notFound) {
-  const seen = new Map();
-  page.on("response", async (response) => {
-    const url = response.url();
-    if (response.status() >= 400) notFound.push(`${response.status()} ${url}`);
-    if (seen.has(url)) return;
-    try {
-      const body = await response.body();
-      seen.set(url, {
-        bytes: body.length,
-        // What the wire carried, which is what a visitor waits for.
-        encoded: Number(response.headers()["content-length"]) || body.length,
-        type: url.split("?")[0].split(".").pop(),
+/**
+ * Bytes the browser actually pulled, by resource type.
+ *
+ * Read from the Performance API's `encodedBodySize`, not from the response
+ * body. Playwright's `response.body()` is already decompressed, and
+ * `content-length` is absent on a chunked compressed response -- so summing
+ * either reports the *decompressed* total and overstates what a visitor
+ * waits for. That mistake is why an earlier run of this script called the live
+ * page 790 KB when it is 510 KB on the wire: everything but the WebAssembly is
+ * gzipped by the server, and the body lengths hid it.
+ *
+ * `encodedBodySize` is 0 for a cross-origin response without
+ * Timing-Allow-Origin (the Google Fonts files), so those fall back to the body
+ * length and are flagged, rather than silently counting as free.
+ */
+async function measureTransfer(page) {
+  return page.evaluate(() => {
+    const rows = performance.getEntriesByType("resource").map((entry) => ({
+      url: entry.name,
+      wire: entry.encodedBodySize,
+      decoded: entry.decodedBodySize,
+      opaque: entry.encodedBodySize === 0 && entry.decodedBodySize === 0,
+    }));
+    const nav = performance.getEntriesByType("navigation")[0];
+    if (nav) {
+      rows.unshift({
+        url: location.href,
+        wire: nav.encodedBodySize,
+        decoded: nav.decodedBodySize,
+        opaque: false,
       });
-    } catch {
-      /* redirects and aborted requests have no body */
     }
+    return rows;
   });
-  return seen;
+}
+
+function summarise(rows) {
+  const kind = (url) => {
+    const path = url.split("?")[0];
+    if (/\.wasm$/.test(path)) return "wasm";
+    if (/\.m?js$/.test(path)) return "js";
+    if (/\.css$/.test(path)) return "css";
+    if (/\.woff2?$/.test(path)) return "font";
+    if (/fonts\.googleapis/.test(path)) return "font css";
+    if (/\/v1\//.test(path)) return "api";
+    return "document";
+  };
+  const byKind = {};
+  let wire = 0;
+  let decoded = 0;
+  const opaque = [];
+  for (const row of rows) {
+    const k = kind(row.url);
+    byKind[k] = (byKind[k] ?? 0) + row.wire;
+    wire += row.wire;
+    decoded += row.decoded;
+    if (row.opaque) opaque.push(row.url);
+  }
+  return { byKind, wire, decoded, opaque, count: rows.length };
 }
 
 /**
@@ -123,8 +162,14 @@ async function run(label, device, viewport) {
   );
   const page = await context.newPage();
   const touch = Boolean(device?.hasTouch);
+  // Only the failures need a listener; sizes come from the Performance API
+  // after load, which is the only place the compressed size is visible.
   const notFound = [];
-  const transfer = trackTransfer(page, notFound);
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      notFound.push(`${response.status()} ${response.url()}`);
+    }
+  });
 
   const consoleErrors = [];
   page.on("console", (message) => {
@@ -342,21 +387,21 @@ async function run(label, device, viewport) {
   );
 
   // ---- weight -------------------------------------------------------------
-  let total = 0;
-  const byType = {};
-  for (const [, info] of transfer) {
-    total += info.encoded;
-    byType[info.type] = (byType[info.type] ?? 0) + info.encoded;
-  }
+  const t = summarise(await measureTransfer(page));
   const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
-  console.log(`\n  ${label} weight: ${kb(total)} over ${transfer.size} requests`);
-  for (const [type, bytes] of Object.entries(byType).sort((a, b) => b[1] - a[1])) {
-    console.log(`    ${type.padEnd(6)} ${kb(bytes)}`);
+  console.log(`\n  ${label} weight: ${kb(t.wire)} on the wire over ${t.count} requests`);
+  console.log(`  (${kb(t.decoded)} decompressed — the server gzips everything it will)`);
+  for (const [k, bytes] of Object.entries(t.byKind).sort((a, b) => b[1] - a[1])) {
+    console.log(`    ${k.padEnd(10)} ${kb(bytes)}`);
+  }
+  if (t.opaque.length) {
+    console.log(`    ${t.opaque.length} cross-origin response(s) report no size:`);
+    for (const url of t.opaque) console.log(`      ${url}`);
   }
   console.log(`  load to network-idle: ${loadMs} ms`);
 
   await browser.close();
-  return { total, loadMs };
+  return { total: t.wire, loadMs };
 }
 
 const desktop = await run("desktop · 1440×900", null, { width: 1440, height: 900 });
@@ -365,7 +410,7 @@ const phone = await run("phone · iPhone 13", devices["iPhone 13"]);
 console.log(
   `\n${failures === 0 ? "PASS" : `FAIL (${failures})`} — ` +
     `${results.length} checks across two viewports\n` +
-    `desktop ${(desktop.total / 1024).toFixed(1)} KB, ` +
+    `on the wire: desktop ${(desktop.total / 1024).toFixed(1)} KB, ` +
     `phone ${(phone.total / 1024).toFixed(1)} KB`,
 );
 process.exit(failures === 0 ? 0 : 1);

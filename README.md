@@ -194,7 +194,7 @@ runs in the browser. Two candidates, and both fail on something that matters:
   phone mapping, which is a new unevaluated component sitting between the
   measured output and what a listener hears — and every artefact in the audio
   would then be ambiguous between the pipeline and the mapping. It is also a
-  few megabytes on top of a page that currently costs 257 KB, for output that
+  few megabytes on top of a page that currently costs 511 KB, for output that
   is robotic enough to make a correct phoneme string sound wrong.
 
 What *would* be worth doing, and is not done here, is speaking the normalised
@@ -281,6 +281,30 @@ stripped, for the same reason: a saved panel must not report a latency it never
 incurred.
 
 ### Deployment
+
+### Page weight, measured on the live site
+
+| | on the wire | raw |
+|---|---:|---:|
+| `sayso.wasm` | **409.4 KB** | 409.4 KB |
+| JavaScript (site, page chunk, WASM loader) | 93.0 KB | 299.6 KB |
+| CSS | 6.9 KB | 26.2 KB |
+| HTML, font CSS | 1.5 KB | 1.8 KB |
+| **total** | **511 KB** | 745 KB |
+
+Everything is gzipped by the server **except the WebAssembly**, which is 80% of
+the page. Gzipped it would be 112 KB, taking the page to about 212 KB. That is
+in `deploy/sccs-request.md` as a question for whoever runs the host, not as a
+Traefik label guessed at from outside: an unsupported one breaks the router it
+is attached to.
+
+Two corrections, because both were wrong in an earlier version of this file.
+The live site does *not* serve everything uncompressed — that came from a
+`curl -I`, and this server answers HEAD with the uncompressed `content-length`
+while a GET is compressed. And `tests/verify_page.mjs` originally summed
+response body lengths, which Playwright hands over already decompressed, so it
+reported 790 KB for a 511 KB page. It now reads `encodedBodySize` from the
+Performance API, which is the only place the compressed size is visible.
 
 It is deployed as a [Hugging Face Space](api/README.md) by `make space`
 (`deploy/space.sh`), which needs `hf auth login` with a write token first.

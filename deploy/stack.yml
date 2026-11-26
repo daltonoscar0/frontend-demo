@@ -55,10 +55,12 @@ services:
         - "traefik.http.routers.frontend_api.rule=(Host(`oscarpdalton.com`) || Host(`www.oscarpdalton.com`)) && PathPrefix(`/api/frontend`)"
         - "traefik.http.routers.frontend_api.tls=true"
         - "traefik.http.routers.frontend_api.tls.certresolver=letsEncrypt"
-        # Strip the path prefix, and compress the JSON, which is mostly
-        # repeated field names and compresses to about a fifth.
-        - "traefik.http.routers.frontend_api.middlewares=frontend_api_strip,frontend_api_compress"
-        - "traefik.http.middlewares.frontend_api_compress.compress=true"
+        # Strip the path prefix. No compress middleware: something upstream on
+        # this host already gzips JSON and JavaScript -- measured, not assumed
+        # -- so one here would be redundant, and an unsupported label breaks
+        # the router it sits on. See the note in sccs-request.md about
+        # application/wasm, which is the one thing that is *not* compressed.
+        - "traefik.http.routers.frontend_api.middlewares=frontend_api_strip"
         # The service knows nothing about the prefix; strip it before forwarding
         # so /api/frontend/v1/pipeline arrives as /v1/pipeline.
         - "traefik.http.middlewares.frontend_api_strip.stripprefix.prefixes=/api/frontend"
